@@ -47,15 +47,16 @@ class MyGraphFrame(customtkinter.CTkFrame):
             params={"limit": 10000},
         )
 
-        states_df = pd.DataFrame(states_resp.json())
-        states_df["created"] = pd.to_datetime(states_df["created"])
-        states_df["state"] = pd.to_numeric(states_df["state"])
-        states_df = states_df.set_index("created")
-        del states_df["id"]
+        if len(states_resp.json()):
+            states_df = pd.DataFrame(states_resp.json())
+            states_df["created"] = pd.to_datetime(states_df["created"])
+            states_df["state"] = pd.to_numeric(states_df["state"])
+            states_df = states_df.set_index("created")
+            del states_df["id"]
 
-        self.ax.clear()
-        states_df.plot(ax=self.ax)
-        self.canvas.draw()
+            self.ax.clear()
+            states_df.plot(ax=self.ax)
+            self.canvas.draw()
 
         self.after(1000, self.update_plot)
 
@@ -64,30 +65,174 @@ class MyGraphFrame(customtkinter.CTkFrame):
         key_press_handler(event, self.canvas, self.toolbar)
 
 
-class MyCheckboxFrame(customtkinter.CTkFrame):
-    def __init__(self, master, title, values):
+class CamperInterfaceFrame(customtkinter.CTkFrame):
+    def __init__(self, master):
         super().__init__(master)
         self.grid_columnconfigure(0, weight=1)
-        self.values = values
-        self.title = title
-        self.checkboxes = []
 
         self.title = customtkinter.CTkLabel(
-            self, text=self.title, fg_color="gray30", corner_radius=6
+            self, text="Camper", fg_color="gray30", corner_radius=6
         )
         self.title.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="ew")
 
-        for i, value in enumerate(self.values):
-            checkbox = customtkinter.CTkCheckBox(self, text=value)
-            checkbox.grid(row=i + 1, column=0, padx=10, pady=(10, 0), sticky="w")
-            self.checkboxes.append(checkbox)
+        self.household_button = customtkinter.CTkButton(
+            self,
+            text="Household",
+            command=self.household_callback,
+            height=45,
+            text_color="black",
+            font=("font2", 15),
+        )
+        self.household_button.grid(
+            row=1, column=0, padx=10, pady=10, sticky="ew", columnspan=1
+        )
 
-    def get(self):
-        checked_checkboxes = []
-        for checkbox in self.checkboxes:
-            if checkbox.get() == 1:
-                checked_checkboxes.append(checkbox.cget("text"))
-        return checked_checkboxes
+        self.pump_button = customtkinter.CTkButton(
+            self,
+            text="Pump",
+            command=self.pump_callback,
+            height=45,
+            text_color="black",
+            font=("font2", 15),
+        )
+        self.pump_button.grid(
+            row=2, column=0, padx=10, pady=10, sticky="ew", columnspan=1
+        )
+        self.water_label = customtkinter.CTkLabel(
+            self, text="Water", fg_color="transparent", justify="left"
+        )
+        self.water_label.grid(
+            row=3, column=0, padx=10, pady=2, sticky="sw", columnspan=1
+        )
+        self.water_progress = customtkinter.CTkProgressBar(
+            self, orientation="horizontal"
+        )
+        self.water_progress.grid(
+            row=4, column=0, padx=10, pady=2, sticky="ew", columnspan=1
+        )
+
+        self.waste_label = customtkinter.CTkLabel(
+            self, text="Waste", fg_color="transparent", justify="left"
+        )
+        self.waste_label.grid(
+            row=5, column=0, padx=10, pady=2, sticky="sw", columnspan=1
+        )
+        self.waste_progress = customtkinter.CTkProgressBar(
+            self, orientation="horizontal"
+        )
+        self.waste_progress.grid(
+            row=6, column=0, padx=10, pady=2, sticky="ew", columnspan=1
+        )
+
+        self.mains_button = customtkinter.CTkButton(
+            self,
+            text="Mains",
+            height=45,
+            text_color_disabled="black",
+            font=("font2", 15),
+            hover=False,
+            state="disabled",
+        )
+        self.mains_button.grid(
+            row=7, column=0, padx=10, pady=10, sticky="ew", columnspan=1
+        )
+        sensors_resp = requests.get(f"http://localhost:8000/sensors")
+        self.sensor_id = None
+        for sensor in sensors_resp.json():
+            if sensor["name"] == "camper":
+                self.sensor_id = sensor["id"]
+                break
+
+        entities_resp = requests.get(
+            f"http://localhost:8000/sensors/{self.sensor_id}/entities"
+        )
+        self.entity_id_by_name = {e["name"]: e["id"] for e in entities_resp.json()}
+        self.entity_states = {
+            "household_voltage": None,
+            "starter_voltage": None,
+            "mains_voltage": None,
+            "household_state": None,
+            "water_state": None,
+            "waste_state": None,
+            "pump_state": None,
+        }
+        self.update_camper_states()
+
+    def household_callback(self):
+        if self.entity_states["household_state"] == "OFF":
+            data_dict = {"state": 1}
+        else:
+            data_dict = {"state": 0}
+
+        states_resp = requests.post(
+            f"http://localhost:8000/action/{self.entity_id_by_name['household_state']}",
+            json=data_dict,
+        )
+
+        self.entity_states["household_state"] = states_resp.json()["state"]
+        self.update_camper_gui()
+
+    def pump_callback(self):
+        if self.entity_states["pump_state"] == "0":
+            data_dict = {"state": 1}
+        else:
+            data_dict = {"state": 0}
+
+        states_resp = requests.post(
+            f"http://localhost:8000/action/{self.entity_id_by_name['pump_state']}",
+            json=data_dict,
+        )
+
+        self.entity_states["pump_state"] = states_resp.json()["state"]
+        self.update_camper_gui()
+
+    def update_camper_states(self):
+        states_resp = requests.get(
+            f"http://localhost:8000/sensors/{self.sensor_id}/states/"
+        )
+        state_by_id = {s["entity_id"]: s["state"] for s in states_resp.json()}
+
+        for entity_name in self.entity_states.keys():
+            entity_id = self.entity_id_by_name[entity_name]
+            if entity_id in state_by_id.keys():
+                self.entity_states[entity_name] = state_by_id[entity_id]
+
+        self.update_camper_gui()
+
+        self.after(10000, self.update_camper_states)
+
+    def update_camper_gui(self):
+        if self.entity_states["household_state"] == "OFF":
+            self.household_button.configure(fg_color="red", text="Household [OFF]")
+        elif self.entity_states["household_state"] == "ON":
+            self.household_button.configure(fg_color="green", text="Household [ON]")
+        else:
+            self.household_button.configure(
+                fg_color="orange", text="Household [PENDING]"
+            )
+
+        if self.entity_states["pump_state"] == "1":
+            self.pump_button.configure(fg_color="green", text="Pump [ON]")
+        else:
+            self.pump_button.configure(fg_color="red", text="Pump [OFF]")
+
+        water_progress = 0
+        if self.entity_states["water_state"]:
+            water_progress = int(self.entity_states["water_state"]) / 100
+        self.water_progress.set(water_progress)
+
+        waste_progress = 0
+        if self.entity_states["waste_state"]:
+            waste_progress = int(self.entity_states["waste_state"]) / 100
+        self.waste_progress.set(waste_progress)
+
+        if (
+            self.entity_states["mains_voltage"] is not None
+            and int(self.entity_states["mains_voltage"]) > 7000
+        ):
+            self.mains_button.configure(fg_color="green", text="Mains [CONNECTED]")
+        else:
+            self.mains_button.configure(fg_color="red", text="Mains [NOT CONNECTED]")
 
 
 class MyRadiobuttonFrame(customtkinter.CTkFrame):
@@ -128,10 +273,11 @@ class App(customtkinter.CTk):
         self.grid_columnconfigure((0, 1), weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        self.checkbox_frame = MyCheckboxFrame(
-            self, "Values", values=["value 1", "value 2", "value 3"]
+        self.camper_interface_frame = CamperInterfaceFrame(self)
+        self.camper_interface_frame.grid(
+            row=0, column=0, padx=10, pady=(10, 0), sticky="nsew"
         )
-        self.checkbox_frame.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="nsew")
+
         self.radiobutton_frame = MyRadiobuttonFrame(
             self, "Options", values=["option 1", "option 2"]
         )
@@ -143,15 +289,6 @@ class App(customtkinter.CTk):
         self.graph_frame.grid(
             row=0, column=2, padx=(0, 10), pady=(10, 0), sticky="nsew"
         )
-
-        self.button = customtkinter.CTkButton(
-            self, text="my button", command=self.button_callback
-        )
-        self.button.grid(row=3, column=0, padx=10, pady=10, sticky="ew", columnspan=3)
-
-    def button_callback(self):
-        print("checkbox_frame:", self.checkbox_frame.get())
-        print("radiobutton_frame:", self.radiobutton_frame.get())
 
 
 app = App()
