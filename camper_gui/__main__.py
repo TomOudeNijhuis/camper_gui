@@ -68,12 +68,15 @@ class MyGraphFrame(customtkinter.CTkFrame):
 class CamperInterfaceFrame(customtkinter.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
-        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure((0, 1), weight=1)
+        self.grid_rowconfigure(0, weight=0)
 
         self.title = customtkinter.CTkLabel(
             self, text="Camper", fg_color="gray30", corner_radius=6
         )
-        self.title.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="ew")
+        self.title.grid(
+            row=0, column=0, padx=10, pady=(10, 0), sticky="ew", columnspan=2
+        )
 
         self.household_button = customtkinter.CTkButton(
             self,
@@ -84,7 +87,7 @@ class CamperInterfaceFrame(customtkinter.CTkFrame):
             font=("font2", 15),
         )
         self.household_button.grid(
-            row=1, column=0, padx=10, pady=10, sticky="ew", columnspan=1
+            row=1, column=0, padx=10, pady=10, sticky="ew", columnspan=2
         )
 
         self.pump_button = customtkinter.CTkButton(
@@ -96,32 +99,32 @@ class CamperInterfaceFrame(customtkinter.CTkFrame):
             font=("font2", 15),
         )
         self.pump_button.grid(
-            row=2, column=0, padx=10, pady=10, sticky="ew", columnspan=1
+            row=2, column=0, padx=10, pady=10, sticky="ew", columnspan=2
         )
         self.water_label = customtkinter.CTkLabel(
             self, text="Water", fg_color="transparent", justify="left"
         )
         self.water_label.grid(
-            row=3, column=0, padx=10, pady=2, sticky="sw", columnspan=1
+            row=3, column=0, padx=10, pady=2, sticky="sw", columnspan=2
         )
         self.water_progress = customtkinter.CTkProgressBar(
             self, orientation="horizontal"
         )
         self.water_progress.grid(
-            row=4, column=0, padx=10, pady=2, sticky="ew", columnspan=1
+            row=4, column=0, padx=10, pady=2, sticky="ew", columnspan=2
         )
 
         self.waste_label = customtkinter.CTkLabel(
             self, text="Waste", fg_color="transparent", justify="left"
         )
         self.waste_label.grid(
-            row=5, column=0, padx=10, pady=2, sticky="sw", columnspan=1
+            row=5, column=0, padx=10, pady=2, sticky="sw", columnspan=2
         )
         self.waste_progress = customtkinter.CTkProgressBar(
             self, orientation="horizontal"
         )
         self.waste_progress.grid(
-            row=6, column=0, padx=10, pady=2, sticky="ew", columnspan=1
+            row=6, column=0, padx=10, pady=2, sticky="ew", columnspan=2
         )
 
         self.mains_button = customtkinter.CTkButton(
@@ -134,8 +137,48 @@ class CamperInterfaceFrame(customtkinter.CTkFrame):
             state="disabled",
         )
         self.mains_button.grid(
-            row=7, column=0, padx=10, pady=10, sticky="ew", columnspan=1
+            row=7, column=0, padx=10, pady=10, sticky="ew", columnspan=2
         )
+
+        self.starter_voltage_label = customtkinter.CTkLabel(
+            self, text="Starter [V]", fg_color="transparent", justify="left"
+        )
+        self.starter_voltage_label.grid(
+            row=8, column=0, padx=10, pady=2, sticky="sw", columnspan=1
+        )
+        self.starter_voltage = customtkinter.StringVar()
+        self.starter_voltage_entry = customtkinter.CTkEntry(
+            self,
+            textvariable=self.starter_voltage,
+            text_color="black",
+            font=("font2", 15),
+            height=45,
+            state="disabled",
+        )
+        self.starter_voltage_entry.grid(
+            row=9, column=0, padx=10, pady=2, sticky="ew", columnspan=1
+        )
+
+        self.household_voltage_label = customtkinter.CTkLabel(
+            self, text="Household [V]", fg_color="transparent", justify="left"
+        )
+        self.household_voltage_label.grid(
+            row=8, column=1, padx=10, pady=2, sticky="sw", columnspan=1
+        )
+        self.household_voltage = customtkinter.StringVar()
+        self.household_voltage_entry = customtkinter.CTkEntry(
+            self,
+            textvariable=self.household_voltage,
+            text_color="black",
+            font=("font2", 15),
+            height=45,
+            state="disabled",
+        )
+        self.household_voltage_entry.grid(
+            row=9, column=1, padx=10, pady=2, sticky="ew", columnspan=1
+        )
+
+        self.starter_voltage.set("12 Volt")
         sensors_resp = requests.get(f"http://localhost:8000/sensors")
         self.sensor_id = None
         for sensor in sensors_resp.json():
@@ -160,9 +203,9 @@ class CamperInterfaceFrame(customtkinter.CTkFrame):
 
     def household_callback(self):
         if self.entity_states["household_state"] == "OFF":
-            data_dict = {"state": 1}
+            data_dict = {"state": "ON"}
         else:
-            data_dict = {"state": 0}
+            data_dict = {"state": "OFF"}
 
         states_resp = requests.post(
             f"http://localhost:8000/action/{self.entity_id_by_name['household_state']}",
@@ -173,10 +216,10 @@ class CamperInterfaceFrame(customtkinter.CTkFrame):
         self.update_camper_gui()
 
     def pump_callback(self):
-        if self.entity_states["pump_state"] == "0":
-            data_dict = {"state": 1}
+        if self.entity_states["pump_state"] == "OFF":
+            data_dict = {"state": "ON"}
         else:
-            data_dict = {"state": 0}
+            data_dict = {"state": "OFF"}
 
         states_resp = requests.post(
             f"http://localhost:8000/action/{self.entity_id_by_name['pump_state']}",
@@ -211,7 +254,7 @@ class CamperInterfaceFrame(customtkinter.CTkFrame):
                 fg_color="orange", text="Household [PENDING]"
             )
 
-        if self.entity_states["pump_state"] == "1":
+        if self.entity_states["pump_state"] == "ON":
             self.pump_button.configure(fg_color="green", text="Pump [ON]")
         else:
             self.pump_button.configure(fg_color="red", text="Pump [OFF]")
@@ -233,6 +276,22 @@ class CamperInterfaceFrame(customtkinter.CTkFrame):
             self.mains_button.configure(fg_color="green", text="Mains [CONNECTED]")
         else:
             self.mains_button.configure(fg_color="red", text="Mains [NOT CONNECTED]")
+
+        household_voltage = int(self.entity_states["household_voltage"]) / 1000
+        self.household_voltage.set(household_voltage)
+
+        if household_voltage > 12:
+            self.household_voltage_entry.configure(fg_color="green")
+        else:
+            self.household_voltage_entry.configure(fg_color="red")
+
+        starter_voltage = int(self.entity_states["starter_voltage"]) / 1000
+        self.starter_voltage.set(household_voltage)
+
+        if starter_voltage > 12:
+            self.starter_voltage_entry.configure(fg_color="green")
+        else:
+            self.starter_voltage_entry.configure(fg_color="red")
 
 
 class MyRadiobuttonFrame(customtkinter.CTkFrame):
@@ -269,8 +328,8 @@ class App(customtkinter.CTk):
 
         self.title("my app")
         self.geometry("1024x600")
-        # self.attributes("-fullscreen", True)
-        self.grid_columnconfigure((0, 1), weight=1)
+        self.attributes("-fullscreen", True)
+        self.grid_columnconfigure((0, 1, 2), weight=1)
         self.grid_rowconfigure(0, weight=1)
 
         self.camper_interface_frame = CamperInterfaceFrame(self)
