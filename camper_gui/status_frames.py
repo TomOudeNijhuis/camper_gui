@@ -76,7 +76,7 @@ class StatusBarFrame(customtkinter.CTkFrame):
             message_color = "red"
 
         self.message_text.configure(
-            text=f"{active_message['stamp'].strftime("%Y-%m-%d %H:%M")}: {active_message['message']}",
+            text=f"{active_message['stamp'].strftime('%Y-%m-%d %H:%M')}: {active_message['message']}",
             fg_color=message_color,
         )
 
@@ -145,5 +145,10 @@ class StatusMessagesFrame(customtkinter.CTkFrame):
 
                 self.stamp_labels[i].configure(text=stamp_str, fg_color=message_color)
                 self.messages[i].configure(text=text_str, fg_color=message_color)
+
+            if len(self.statusbar.message_list) == 0:
+                self.messages[0].configure(
+                    text="Currently there are no messages", fg_color="transparent"
+                )
 
         self.after(5000, self.update_messages)
