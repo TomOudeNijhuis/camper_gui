@@ -13,6 +13,10 @@ from matplotlib.backends.backend_tkagg import (
 from matplotlib.backend_bases import key_press_handler
 
 
+class ApiException(Exception):
+    pass
+
+
 class MyGraphFrame(customtkinter.CTkFrame):
     def __init__(self, master, title):
         super().__init__(master)
@@ -42,12 +46,21 @@ class MyGraphFrame(customtkinter.CTkFrame):
 
     def update_plot(self):
         entity_id = 7
-        states_resp = requests.get(
-            f"http://localhost:8000/entities/{entity_id}/states",
-            params={"limit": 10000},
-        )
 
-        if len(states_resp.json()):
+        try:
+            states_resp = requests.get(
+                f"http://localhost:8000/entities/{entity_id}/states",
+                params={"limit": 10000},
+            )
+        except (
+            requests.exceptions.Timeout,
+            requests.exceptions.ConnectionError,
+            ApiException,
+        ) as ex:
+            states_resp = None
+            print(f"Fout: {str(ex)}")
+
+        if states_resp and len(states_resp.json()):
             states_df = pd.DataFrame(states_resp.json())
             states_df["created"] = pd.to_datetime(states_df["created"])
             states_df["state"] = pd.to_numeric(states_df["state"])
@@ -57,8 +70,11 @@ class MyGraphFrame(customtkinter.CTkFrame):
             self.ax.clear()
             states_df.plot(ax=self.ax)
             self.canvas.draw()
+        else:
+            self.ax.clear()
+            self.canvas.draw()
 
-        self.after(1000, self.update_plot)
+        self.after(60000, self.update_plot)
 
     def on_key_event(self, event):
         print("you pressed %s" % event.key)
@@ -179,17 +195,28 @@ class CamperInterfaceFrame(customtkinter.CTkFrame):
         )
 
         self.starter_voltage.set("12 Volt")
-        sensors_resp = requests.get(f"http://localhost:8000/sensors")
-        self.sensor_id = None
-        for sensor in sensors_resp.json():
-            if sensor["name"] == "camper":
-                self.sensor_id = sensor["id"]
-                break
+        try:
+            sensors_resp = requests.get(f"http://localhost:8000/sensors")
+            self.sensor_id = None
+            for sensor in sensors_resp.json():
+                if sensor["name"] == "camper":
+                    self.sensor_id = sensor["id"]
+                    break
 
-        entities_resp = requests.get(
-            f"http://localhost:8000/sensors/{self.sensor_id}/entities"
-        )
-        self.entity_id_by_name = {e["name"]: e["id"] for e in entities_resp.json()}
+            entities_resp = requests.get(
+                f"http://localhost:8000/sensors/{self.sensor_id}/entities", timeout=3
+            )
+            self.entity_id_by_name = {e["name"]: e["id"] for e in entities_resp.json()}
+
+        except (
+            requests.exceptions.Timeout,
+            requests.exceptions.ConnectionError,
+            ApiException,
+        ) as ex:
+            self.sensor_id = None
+            self.entity_id_by_name = {}
+            print(f"Fout: {str(ex)}")
+
         self.entity_states = {
             "household_voltage": None,
             "starter_voltage": None,
@@ -230,15 +257,27 @@ class CamperInterfaceFrame(customtkinter.CTkFrame):
         self.update_camper_gui()
 
     def update_camper_states(self):
-        states_resp = requests.get(
-            f"http://localhost:8000/sensors/{self.sensor_id}/states/"
-        )
-        state_by_id = {s["entity_id"]: s["state"] for s in states_resp.json()}
+        try:
+            if self.sensor_id is None:
+                raise ApiException("sensor_id not set")
 
-        for entity_name in self.entity_states.keys():
-            entity_id = self.entity_id_by_name[entity_name]
-            if entity_id in state_by_id.keys():
-                self.entity_states[entity_name] = state_by_id[entity_id]
+            states_resp = requests.get(
+                f"http://localhost:8000/sensors/{self.sensor_id}/states/", timeout=3
+            )
+            state_by_id = {s["entity_id"]: s["state"] for s in states_resp.json()}
+
+            for entity_name in self.entity_states.keys():
+                entity_id = self.entity_id_by_name[entity_name]
+                if entity_id in state_by_id.keys():
+                    self.entity_states[entity_name] = state_by_id[entity_id]
+        except (
+            requests.exceptions.Timeout,
+            requests.exceptions.ConnectionError,
+            ApiException,
+        ) as ex:
+            for entity_name in self.entity_states.keys():
+                self.entity_states[entity_name] = None
+            print(f"Fout: {str(ex)}")
 
         self.update_camper_gui()
 
@@ -277,21 +316,27 @@ class CamperInterfaceFrame(customtkinter.CTkFrame):
         else:
             self.mains_button.configure(fg_color="red", text="Mains [NOT CONNECTED]")
 
-        household_voltage = int(self.entity_states["household_voltage"]) / 1000
-        self.household_voltage.set(household_voltage)
+        if self.entity_states["household_voltage"]:
+            household_voltage = int(self.entity_states["household_voltage"]) / 1000
+            self.household_voltage.set(household_voltage)
 
-        if household_voltage > 12:
-            self.household_voltage_entry.configure(fg_color="green")
+            if household_voltage > 12:
+                self.household_voltage_entry.configure(fg_color="green")
+            else:
+                self.household_voltage_entry.configure(fg_color="red")
         else:
-            self.household_voltage_entry.configure(fg_color="red")
+            self.household_voltage_entry.configure(fg_color="grey")
 
-        starter_voltage = int(self.entity_states["starter_voltage"]) / 1000
-        self.starter_voltage.set(household_voltage)
+        if self.entity_states["starter_voltage"]:
+            starter_voltage = int(self.entity_states["starter_voltage"]) / 1000
+            self.starter_voltage.set(household_voltage)
 
-        if starter_voltage > 12:
-            self.starter_voltage_entry.configure(fg_color="green")
+            if starter_voltage > 12:
+                self.starter_voltage_entry.configure(fg_color="green")
+            else:
+                self.starter_voltage_entry.configure(fg_color="red")
         else:
-            self.starter_voltage_entry.configure(fg_color="red")
+            self.starter_voltage_entry.configure(fg_color="grey")
 
 
 class MyRadiobuttonFrame(customtkinter.CTkFrame):
@@ -322,6 +367,33 @@ class MyRadiobuttonFrame(customtkinter.CTkFrame):
         self.variable.set(value)
 
 
+class StatusBarFrame(customtkinter.CTkFrame):
+    def __init__(self, master):
+        super().__init__(master)
+        self.master = master
+        self.grid_columnconfigure(0, weight=11)
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+
+        self.message_text = customtkinter.CTkLabel(
+            self, text="No messages", fg_color="gray30"
+        )
+        self.message_text.grid(row=0, column=0, padx=5, pady=(10, 0), sticky="nsew")
+
+        self.exit_button = customtkinter.CTkButton(
+            self,
+            text="Exit",
+            command=self.exit_callback,
+            height=45,
+            text_color="black",
+            font=("font2", 15),
+        )
+        self.exit_button.grid(row=0, column=1, padx=5, pady=(10, 0), sticky="nsew")
+
+    def exit_callback(self):
+        self.master.destroy()
+
+
 class App(customtkinter.CTk):
     def __init__(self):
         super().__init__()
@@ -329,7 +401,7 @@ class App(customtkinter.CTk):
         self.title("my app")
         self.geometry("1024x600")
         self.attributes("-fullscreen", True)
-        self.grid_columnconfigure((0, 1, 2), weight=1)
+        self.grid_columnconfigure((0, 1), weight=1)
         self.grid_rowconfigure(0, weight=1)
 
         self.camper_interface_frame = CamperInterfaceFrame(self)
@@ -337,16 +409,22 @@ class App(customtkinter.CTk):
             row=0, column=0, padx=10, pady=(10, 0), sticky="nsew"
         )
 
+        """
         self.radiobutton_frame = MyRadiobuttonFrame(
             self, "Options", values=["option 1", "option 2"]
         )
         self.radiobutton_frame.grid(
             row=0, column=1, padx=(0, 10), pady=(10, 0), sticky="nsew"
         )
-
+        """
         self.graph_frame = MyGraphFrame(self, "Graph")
         self.graph_frame.grid(
-            row=0, column=2, padx=(0, 10), pady=(10, 0), sticky="nsew"
+            row=0, column=1, padx=(0, 10), pady=(10, 0), sticky="nsew"
+        )
+
+        self.statusbar_frame = StatusBarFrame(self)
+        self.statusbar_frame.grid(
+            row=1, column=0, padx=(0, 10), pady=(10, 0), sticky="nsew", columnspan=2
         )
 
 
