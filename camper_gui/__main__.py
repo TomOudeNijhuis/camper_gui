@@ -4,7 +4,7 @@ import requests
 
 from camper_interface_frame import CamperInterfaceFrame
 from graph_frame import GraphFrame
-from statusbar_frame import StatusBarFrame
+from status_frames import StatusBarFrame, StatusMessagesFrame
 
 
 class App(customtkinter.CTk):
@@ -19,11 +19,10 @@ class App(customtkinter.CTk):
         else:
             self.attributes("-fullscreen", True)
 
-        self.grid_columnconfigure((0, 1), weight=1)
-        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
 
         tabview = customtkinter.CTkTabview(master=self)
-        tabview.pack(padx=5, pady=5)
         tabview._segmented_button.configure(font=("font2", 15))
         tabview.add("Status")
         tabview.add("History")
@@ -50,16 +49,29 @@ class App(customtkinter.CTk):
         self.graph_frame = GraphFrame(
             tabview.tab("History"), self.statusbar_frame, api_sensors
         )
+        self.status_messages_frame = StatusMessagesFrame(
+            tabview.tab("Messages"), self.statusbar_frame
+        )
+        tabview.grid(row=0, column=0, padx=5, pady=0, sticky="nsew")
 
-        tabview.grid(row=0, column=0, padx=5, pady=0, sticky="nsew", columnspan=2)
+        tabview.tab("Status").grid_columnconfigure(0, weight=1)
+        tabview.tab("Status").grid_rowconfigure(1, weight=1)
+        tabview.tab("History").grid_columnconfigure(0, weight=1)
+        tabview.tab("History").grid_rowconfigure(1, weight=1)
+        tabview.tab("Messages").grid_columnconfigure(0, weight=1)
+        tabview.tab("Messages").grid_rowconfigure(1, weight=1)
+
         self.camper_interface_frame.grid(
             row=1, column=0, padx=10, pady=(10, 0), sticky="nsew"
         )
         self.graph_frame.grid(
-            row=1, column=1, padx=(0, 10), pady=(10, 0), sticky="nsew"
+            row=1, column=0, padx=(0, 10), pady=(10, 0), sticky="nsew"
+        )
+        self.status_messages_frame.grid(
+            row=1, column=0, padx=(0, 0), pady=(10, 0), sticky="nsew"
         )
         self.statusbar_frame.grid(
-            row=2, column=0, padx=(0, 0), pady=(10, 0), sticky="nsew", columnspan=2
+            row=2, column=0, padx=(0, 0), pady=(10, 0), sticky="nsew"
         )
 
 

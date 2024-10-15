@@ -251,13 +251,14 @@ class CamperInterfaceFrame(customtkinter.CTkFrame):
                     f"Could not retrieve status from API: {ex.__class__.__name__}",
                     details=str(ex),
                 )
+
+            self.update_camper_gui()
+
         else:
             for entity_name in self.entity_states.keys():
                 self.entity_states[entity_name] = None
 
-        self.update_camper_gui()
-
-        self.after(10000, self.update_camper_states)
+        self.after(5000, self.update_camper_states)
 
     def update_camper_gui(self):
         match self.entity_states["household_state"]:
