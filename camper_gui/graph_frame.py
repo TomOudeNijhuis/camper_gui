@@ -1,6 +1,7 @@
 import customtkinter
 import tkinter
 import requests
+from datetime import timedelta
 import matplotlib
 
 matplotlib.use("TkAgg")
@@ -149,6 +150,7 @@ class GraphFrame(customtkinter.CTkFrame):
                     states_df["created"] = pd.to_datetime(states_df["created"])
                     states_df["state"] = pd.to_numeric(states_df["state"])
                     states_df = states_df.set_index("created")
+                    states_df = states_df.resample(timedelta(minutes=5)).mean()
                     del states_df["id"]
                     del states_df["entity_id"]
 
