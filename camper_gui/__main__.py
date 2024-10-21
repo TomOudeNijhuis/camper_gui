@@ -5,6 +5,8 @@ import requests
 from camper_interface_frame import CamperInterfaceFrame
 from graph_frame import GraphFrame
 from status_frames import StatusBarFrame, StatusMessagesFrame
+from power_frame import PowerFrame
+from config import settings
 
 
 class App(customtkinter.CTk):
@@ -22,16 +24,18 @@ class App(customtkinter.CTk):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
-        tabview = customtkinter.CTkTabview(master=self)
-        tabview._segmented_button.configure(font=("font2", 15))
-        tabview.add("Status")
-        tabview.add("History")
-        tabview.add("Messages")
+        self.tabview = customtkinter.CTkTabview(
+            master=self, command=self.main_tab_changed
+        )
+        self.tabview._segmented_button.configure(font=("font2", 15))
+        self.tabview.add("Status")
+        self.tabview.add("History")
+        self.tabview.add("Messages")
 
         self.statusbar_frame = StatusBarFrame(self)
 
         try:
-            sensors_resp = requests.get(f"http://localhost:8000/sensors")
+            sensors_resp = requests.get(f"{settings.api_base}/sensors")
             api_sensors = sensors_resp.json()
         except (
             requests.exceptions.Timeout,
@@ -44,26 +48,31 @@ class App(customtkinter.CTk):
             )
 
         self.camper_interface_frame = CamperInterfaceFrame(
-            tabview.tab("Status"), self.statusbar_frame, api_sensors
+            self.tabview.tab("Status"), self.statusbar_frame, api_sensors
         )
+        self.power_frame = PowerFrame(
+            self.tabview.tab("Status"), self.statusbar_frame, api_sensors
+        )
+
         self.graph_frame = GraphFrame(
-            tabview.tab("History"), self.statusbar_frame, api_sensors
+            self.tabview.tab("History"), self.statusbar_frame, api_sensors
         )
         self.status_messages_frame = StatusMessagesFrame(
-            tabview.tab("Messages"), self.statusbar_frame
+            self.tabview.tab("Messages"), self.statusbar_frame
         )
-        tabview.grid(row=0, column=0, padx=5, pady=0, sticky="nsew")
+        self.tabview.grid(row=0, column=0, padx=5, pady=0, sticky="nsew")
 
-        tabview.tab("Status").grid_columnconfigure(0, weight=1)
-        tabview.tab("Status").grid_rowconfigure(1, weight=1)
-        tabview.tab("History").grid_columnconfigure(0, weight=1)
-        tabview.tab("History").grid_rowconfigure(1, weight=1)
-        tabview.tab("Messages").grid_columnconfigure(0, weight=1)
-        tabview.tab("Messages").grid_rowconfigure(1, weight=1)
+        self.tabview.tab("Status").grid_columnconfigure((0, 1), weight=1)
+        self.tabview.tab("Status").grid_rowconfigure(1, weight=1)
+        self.tabview.tab("History").grid_columnconfigure(0, weight=1)
+        self.tabview.tab("History").grid_rowconfigure(1, weight=1)
+        self.tabview.tab("Messages").grid_columnconfigure(0, weight=1)
+        self.tabview.tab("Messages").grid_rowconfigure(1, weight=1)
 
         self.camper_interface_frame.grid(
             row=1, column=0, padx=10, pady=(10, 0), sticky="nsew"
         )
+        self.power_frame.grid(row=1, column=1, padx=10, pady=(10, 0), sticky="nsew")
         self.graph_frame.grid(
             row=1, column=0, padx=(0, 10), pady=(10, 0), sticky="nsew"
         )
@@ -73,6 +82,20 @@ class App(customtkinter.CTk):
         self.statusbar_frame.grid(
             row=2, column=0, padx=(0, 0), pady=(10, 0), sticky="nsew"
         )
+
+    def main_tab_changed(self):
+        current_tab = self.tabview.get()
+
+        match current_tab:
+            case "Status":
+                self.camper_interface_frame.update_states()
+                self.power_frame.update_states()
+            case "History":
+                self.graph_frame.update_plot()
+            case "Messages":
+                self.status_messages_frame.update_messages()
+            case _:
+                raise Exception(f"Unknown tab {current_tab}")
 
 
 app = App()

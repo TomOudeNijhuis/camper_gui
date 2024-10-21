@@ -1,12 +1,15 @@
 import customtkinter
 import requests
 
+from config import settings
+from frame_base import FrameBase
+
 
 class ApiException(Exception):
     pass
 
 
-class CamperInterfaceFrame(customtkinter.CTkFrame):
+class CamperInterfaceFrame(FrameBase):
     def __init__(self, master, statusbar, api_sensors):
         super().__init__(master)
         self.master = master
@@ -15,112 +18,31 @@ class CamperInterfaceFrame(customtkinter.CTkFrame):
         self.grid_columnconfigure((0, 1), weight=1)
         self.grid_rowconfigure(0, weight=0)
 
-        self.title = customtkinter.CTkLabel(
-            self, text="Camper", fg_color="gray30", corner_radius=6
+        self.title_label = self._add_title("Camper")
+        self.household_button = self._add_button(
+            "Household", 1, 0, columnspan=2, command=self.household_callback
         )
-        self.title.grid(
-            row=0, column=0, padx=10, pady=(10, 0), sticky="ew", columnspan=2
+        self.pump_button = self._add_button(
+            "Pump", 2, 0, columnspan=2, command=self.pump_callback
         )
-
-        self.household_button = customtkinter.CTkButton(
-            self,
-            text="Household",
-            command=self.household_callback,
-            height=45,
-            text_color="black",
-            font=("font2", 15),
+        self.water_label, self.water_progress = self._add_progress(
+            "Water", 3, 0, columnspan=2
         )
-        self.household_button.grid(
-            row=1, column=0, padx=10, pady=10, sticky="ew", columnspan=2
+        self.waste_label, self.waste_progress = self._add_progress(
+            "Waste", 5, 0, columnspan=2
+        )
+        self.mains_button = self._add_button(
+            "Mains", 7, 0, columnspan=2, state="disabled", hover=False
         )
 
-        self.pump_button = customtkinter.CTkButton(
-            self,
-            text="Pump",
-            command=self.pump_callback,
-            height=45,
-            text_color="black",
-            font=("font2", 15),
+        self.starter_voltage, self.starter_voltage_label, self.starter_voltage_entry = (
+            self._add_entry("Starter [V]", 8, 0)
         )
-        self.pump_button.grid(
-            row=2, column=0, padx=10, pady=10, sticky="ew", columnspan=2
-        )
-        self.water_label = customtkinter.CTkLabel(
-            self, text="Water", fg_color="transparent", justify="left"
-        )
-        self.water_label.grid(
-            row=3, column=0, padx=10, pady=2, sticky="sw", columnspan=2
-        )
-        self.water_progress = customtkinter.CTkProgressBar(
-            self, orientation="horizontal"
-        )
-        self.water_progress.grid(
-            row=4, column=0, padx=10, pady=2, sticky="ew", columnspan=2
-        )
-
-        self.waste_label = customtkinter.CTkLabel(
-            self, text="Waste", fg_color="transparent", justify="left"
-        )
-        self.waste_label.grid(
-            row=5, column=0, padx=10, pady=2, sticky="sw", columnspan=2
-        )
-        self.waste_progress = customtkinter.CTkProgressBar(
-            self, orientation="horizontal"
-        )
-        self.waste_progress.grid(
-            row=6, column=0, padx=10, pady=2, sticky="ew", columnspan=2
-        )
-
-        self.mains_button = customtkinter.CTkButton(
-            self,
-            text="Mains",
-            height=45,
-            text_color_disabled="black",
-            font=("font2", 15),
-            hover=False,
-            state="disabled",
-        )
-        self.mains_button.grid(
-            row=7, column=0, padx=10, pady=10, sticky="ew", columnspan=2
-        )
-
-        self.starter_voltage_label = customtkinter.CTkLabel(
-            self, text="Starter [V]", fg_color="transparent", justify="left"
-        )
-        self.starter_voltage_label.grid(
-            row=8, column=0, padx=10, pady=2, sticky="sw", columnspan=1
-        )
-        self.starter_voltage = customtkinter.StringVar()
-        self.starter_voltage_entry = customtkinter.CTkEntry(
-            self,
-            textvariable=self.starter_voltage,
-            text_color="black",
-            font=("font2", 15),
-            height=45,
-            state="disabled",
-        )
-        self.starter_voltage_entry.grid(
-            row=9, column=0, padx=10, pady=2, sticky="ew", columnspan=1
-        )
-
-        self.household_voltage_label = customtkinter.CTkLabel(
-            self, text="Household [V]", fg_color="transparent", justify="left"
-        )
-        self.household_voltage_label.grid(
-            row=8, column=1, padx=10, pady=2, sticky="sw", columnspan=1
-        )
-        self.household_voltage = customtkinter.StringVar()
-        self.household_voltage_entry = customtkinter.CTkEntry(
-            self,
-            textvariable=self.household_voltage,
-            text_color="black",
-            font=("font2", 15),
-            height=45,
-            state="disabled",
-        )
-        self.household_voltage_entry.grid(
-            row=9, column=1, padx=10, pady=2, sticky="ew", columnspan=1
-        )
+        (
+            self.household_voltage,
+            self.household_voltage_label,
+            self.household_voltage_entry,
+        ) = self._add_entry("Household [V]", 8, 1)
 
         try:
             self.sensor_id = None
@@ -133,7 +55,7 @@ class CamperInterfaceFrame(customtkinter.CTkFrame):
                 raise ApiException("No sensor_id for `camper` in API sensor list.")
 
             entities_resp = requests.get(
-                f"http://localhost:8000/sensors/{self.sensor_id}/entities", timeout=3
+                f"{settings.api_base}/sensors/{self.sensor_id}/entities", timeout=3
             )
             self.entity_id_by_name = {e["name"]: e["id"] for e in entities_resp.json()}
 
@@ -158,7 +80,7 @@ class CamperInterfaceFrame(customtkinter.CTkFrame):
             "waste_state": None,
             "pump_state": None,
         }
-        self.update_camper_states()
+        self.update_states_runner()
 
     def household_callback(self):
         try:
@@ -171,7 +93,7 @@ class CamperInterfaceFrame(customtkinter.CTkFrame):
                 data_dict = {"state": "OFF"}
 
             states_resp = requests.post(
-                f"http://localhost:8000/action/{self.entity_id_by_name['household_state']}",
+                f"{settings.api_base}/action/{self.entity_id_by_name['household_state']}",
                 json=data_dict,
             )
 
@@ -202,7 +124,7 @@ class CamperInterfaceFrame(customtkinter.CTkFrame):
                 data_dict = {"state": "OFF"}
 
             states_resp = requests.post(
-                f"http://localhost:8000/action/{self.entity_id_by_name['pump_state']}",
+                f"{settings.api_base}/action/{self.entity_id_by_name['pump_state']}",
                 json=data_dict,
             )
 
@@ -222,43 +144,47 @@ class CamperInterfaceFrame(customtkinter.CTkFrame):
 
         self.update_camper_gui()
 
-    def update_camper_states(self):
+    def update_states_runner(self):
         current_tab = self.master.master.get()
 
         if current_tab == "Status":
-            try:
-                if self.sensor_id is None:
-                    raise ApiException("sensor_id not set")
-
-                states_resp = requests.get(
-                    f"http://localhost:8000/sensors/{self.sensor_id}/states/", timeout=3
-                )
-                state_by_id = {s["entity_id"]: s["state"] for s in states_resp.json()}
-
-                for entity_name in self.entity_states.keys():
-                    entity_id = self.entity_id_by_name[entity_name]
-                    if entity_id in state_by_id.keys():
-                        self.entity_states[entity_name] = state_by_id[entity_id]
-            except (
-                requests.exceptions.Timeout,
-                requests.exceptions.ConnectionError,
-                ApiException,
-            ) as ex:
-                for entity_name in self.entity_states.keys():
-                    self.entity_states[entity_name] = None
-
-                self.statusbar.add_message(
-                    f"Could not retrieve status from API: {ex.__class__.__name__}",
-                    details=str(ex),
-                )
-
-            self.update_camper_gui()
-
+            self.update_states()
         else:
             for entity_name in self.entity_states.keys():
                 self.entity_states[entity_name] = None
 
-        self.after(5000, self.update_camper_states)
+            self.update_camper_gui()
+
+        self.after(5000, self.update_states_runner)
+
+    def update_states(self):
+        try:
+            if self.sensor_id is None:
+                raise ApiException("sensor_id not set")
+
+            states_resp = requests.get(
+                f"{settings.api_base}/sensors/{self.sensor_id}/states/", timeout=3
+            )
+            state_by_id = {s["entity_id"]: s["state"] for s in states_resp.json()}
+
+            for entity_name in self.entity_states.keys():
+                entity_id = self.entity_id_by_name[entity_name]
+                if entity_id in state_by_id.keys():
+                    self.entity_states[entity_name] = state_by_id[entity_id]
+        except (
+            requests.exceptions.Timeout,
+            requests.exceptions.ConnectionError,
+            ApiException,
+        ) as ex:
+            for entity_name in self.entity_states.keys():
+                self.entity_states[entity_name] = None
+
+            self.statusbar.add_message(
+                f"Could not retrieve status from API: {ex.__class__.__name__}",
+                details=str(ex),
+            )
+
+        self.update_camper_gui()
 
     def update_camper_gui(self):
         match self.entity_states["household_state"]:

@@ -119,36 +119,39 @@ class StatusMessagesFrame(customtkinter.CTkFrame):
             )
             self.messages[i].grid(row=i, column=1, padx=10, pady=2, sticky="nesw")
 
-        self.update_messages()
+        self.update_messages_runner()
 
-    def update_messages(self):
+    def update_messages_runner(self):
         current_tab = self.master.master.get()
 
         if current_tab == "Messages":
-            for i in range(0, MAX_MESSAGES):
-                if len(self.statusbar.message_list) > i:
-                    if self.statusbar.message_list[i]["state"] == "info":
-                        message_color = "green"
-                    elif self.statusbar.message_list[i]["state"] == "warning":
-                        message_color = "orange"
-                    else:
-                        message_color = "red"
+            self.update_message()
 
-                    stamp_str = self.statusbar.message_list[i]["stamp"].strftime(
-                        "%Y-%m-%d %H:%M:%S"
-                    )
-                    text_str = self.statusbar.message_list[i]["message"]
+        self.after(5000, self.update_messages_runner)
+
+    def update_messages(self):
+        for i in range(0, MAX_MESSAGES):
+            if len(self.statusbar.message_list) > i:
+                if self.statusbar.message_list[i]["state"] == "info":
+                    message_color = "green"
+                elif self.statusbar.message_list[i]["state"] == "warning":
+                    message_color = "orange"
                 else:
-                    message_color = "transparent"
-                    stamp_str = ""
-                    text_str = ""
+                    message_color = "red"
 
-                self.stamp_labels[i].configure(text=stamp_str, fg_color=message_color)
-                self.messages[i].configure(text=text_str, fg_color=message_color)
-
-            if len(self.statusbar.message_list) == 0:
-                self.messages[0].configure(
-                    text="Currently there are no messages", fg_color="transparent"
+                stamp_str = self.statusbar.message_list[i]["stamp"].strftime(
+                    "%Y-%m-%d %H:%M:%S"
                 )
+                text_str = self.statusbar.message_list[i]["message"]
+            else:
+                message_color = "transparent"
+                stamp_str = ""
+                text_str = ""
 
-        self.after(5000, self.update_messages)
+            self.stamp_labels[i].configure(text=stamp_str, fg_color=message_color)
+            self.messages[i].configure(text=text_str, fg_color=message_color)
+
+        if len(self.statusbar.message_list) == 0:
+            self.messages[0].configure(
+                text="Currently there are no messages", fg_color="transparent"
+            )

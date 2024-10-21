@@ -2,3 +2,5 @@ customtkinter
 matplotlib
 requests
 pandas
+pydantic
+pydantic_settings
