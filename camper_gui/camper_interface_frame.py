@@ -49,15 +49,10 @@ class CamperInterfaceFrame(FrameBase):
             for sensor in api_sensors:
                 if sensor["name"] == "camper":
                     self.sensor_id = sensor["id"]
+                    self.entity_id_by_name = {
+                        e["name"]: e["id"] for e in sensor["entities"]
+                    }
                     break
-
-            if self.sensor_id is None:
-                raise ApiException("No sensor_id for `camper` in API sensor list.")
-
-            entities_resp = requests.get(
-                f"{settings.api_base}/sensors/{self.sensor_id}/entities", timeout=3
-            )
-            self.entity_id_by_name = {e["name"]: e["id"] for e in entities_resp.json()}
 
         except (
             requests.exceptions.Timeout,

@@ -85,11 +85,7 @@ class GraphFrame(customtkinter.CTkFrame):
 
         try:
             for sensor in api_sensors:
-                entities_resp = requests.get(
-                    f"{settings.api_base}/sensors/{sensor['id']}/entities",
-                    timeout=3,
-                )
-                for entity in entities_resp.json():
+                for entity in sensor["entities"]:
                     self.entity_id_by_name[f"{sensor['name']}_{entity['name']}"] = {
                         "entity_id": entity["id"],
                         "entity_name": entity["name"],

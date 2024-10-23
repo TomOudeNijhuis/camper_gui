@@ -13,6 +13,7 @@ class PowerFrame(FrameBase):
         super().__init__(master)
         self.master = master
         self.statusbar = statusbar
+        self.entity_id_by_name = {}
 
         self.grid_columnconfigure((0, 1), weight=1)
         self.grid_rowconfigure(0, weight=0)
@@ -43,20 +44,14 @@ class PowerFrame(FrameBase):
             for sensor in api_sensors:
                 if sensor["name"] == "SmartSolar":
                     self.sensor_solar_id = sensor["id"]
+                    self.entity_id_by_name.update(
+                        {e["name"]: e["id"] for e in sensor["entities"]}
+                    )
                 elif sensor["name"] == "SmartShunt":
                     self.sensor_shunt_id = sensor["id"]
-
-            self.entity_id_by_name = {}
-            for sensor_id in (self.sensor_shunt_id, self.sensor_solar_id):
-                if sensor_id is None:
-                    raise ApiException("No sensor_id for `x` in API sensor list.")
-
-                entities_resp = requests.get(
-                    f"{settings.api_base}/sensors/{sensor_id}/entities", timeout=3
-                )
-                self.entity_id_by_name.update(
-                    {e["name"]: e["id"] for e in entities_resp.json()}
-                )
+                    self.entity_id_by_name.update(
+                        {e["name"]: e["id"] for e in sensor["entities"]}
+                    )
 
         except (
             requests.exceptions.Timeout,

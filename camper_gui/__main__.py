@@ -3,6 +3,7 @@ import platform
 import requests
 
 from camper_interface_frame import CamperInterfaceFrame
+from temperature_frame import TemperatureFrame
 from graph_frame import GraphFrame
 from status_frames import StatusBarFrame, StatusMessagesFrame
 from power_frame import PowerFrame
@@ -53,7 +54,9 @@ class App(customtkinter.CTk):
         self.power_frame = PowerFrame(
             self.tabview.tab("Status"), self.statusbar_frame, api_sensors
         )
-
+        self.temperture_frame = TemperatureFrame(
+            self.tabview.tab("Status"), self.statusbar_frame, api_sensors
+        )
         self.graph_frame = GraphFrame(
             self.tabview.tab("History"), self.statusbar_frame, api_sensors
         )
@@ -70,9 +73,12 @@ class App(customtkinter.CTk):
         self.tabview.tab("Messages").grid_rowconfigure(1, weight=1)
 
         self.camper_interface_frame.grid(
-            row=1, column=0, padx=10, pady=(10, 0), sticky="nsew"
+            row=1, column=0, padx=10, pady=(10, 0), sticky="nsew", rowspan=2
         )
         self.power_frame.grid(row=1, column=1, padx=10, pady=(10, 0), sticky="nsew")
+        self.temperture_frame.grid(
+            row=2, column=1, padx=10, pady=(10, 0), sticky="nsew"
+        )
         self.graph_frame.grid(
             row=1, column=0, padx=(0, 10), pady=(10, 0), sticky="nsew"
         )
@@ -80,7 +86,7 @@ class App(customtkinter.CTk):
             row=1, column=0, padx=(0, 0), pady=(10, 0), sticky="nsew"
         )
         self.statusbar_frame.grid(
-            row=2, column=0, padx=(0, 0), pady=(10, 0), sticky="nsew"
+            row=3, column=0, padx=(0, 0), pady=(10, 0), sticky="nsew"
         )
 
     def main_tab_changed(self):

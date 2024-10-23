@@ -125,7 +125,7 @@ class StatusMessagesFrame(customtkinter.CTkFrame):
         current_tab = self.master.master.get()
 
         if current_tab == "Messages":
-            self.update_message()
+            self.update_messages()
 
         self.after(5000, self.update_messages_runner)
 

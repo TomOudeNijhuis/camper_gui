@@ -10,7 +10,7 @@ class FrameBase(customtkinter.CTkFrame):
             row=row,
             column=column,
             padx=10,
-            pady=(10, 0),
+            pady=(3, 0),
             sticky="ew",
             columnspan=columnspan,
         )
@@ -37,7 +37,7 @@ class FrameBase(customtkinter.CTkFrame):
             textvariable=var,
             text_color="black",
             font=("font2", 15),
-            height=45,
+            height=40,
             state="disabled",
         )
         var_entry.grid(
