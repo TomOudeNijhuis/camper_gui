@@ -1,5 +1,6 @@
-import customtkinter
 import requests
+from concurrent import futures
+import tkinter as tk
 
 from config import settings
 from frame_base import FrameBase
@@ -25,6 +26,9 @@ class CamperInterfaceFrame(FrameBase):
         self.pump_button = self._add_button(
             "Pump", 2, 0, columnspan=2, command=self.pump_callback
         )
+        self.household_button.configure(state=tk.DISABLED)
+        self.pump_button.configure(state=tk.DISABLED)
+
         self.water_label, self.water_progress = self._add_progress(
             "Water", 3, 0, columnspan=2
         )
@@ -44,27 +48,14 @@ class CamperInterfaceFrame(FrameBase):
             self.household_voltage_entry,
         ) = self._add_entry("Household [V]", 8, 1)
 
-        try:
-            self.sensor_id = None
-            for sensor in api_sensors:
-                if sensor["name"] == "camper":
-                    self.sensor_id = sensor["id"]
-                    self.entity_id_by_name = {
-                        e["name"]: e["id"] for e in sensor["entities"]
-                    }
-                    break
-
-        except (
-            requests.exceptions.Timeout,
-            requests.exceptions.ConnectionError,
-            ApiException,
-        ) as ex:
-            self.sensor_id = None
-            self.entity_id_by_name = {}
-            self.statusbar.add_message(
-                f"Could not communicatie with API: {ex.__class__.__name__}",
-                details=str(ex),
-            )
+        self.sensor_id = None
+        for sensor in api_sensors:
+            if sensor["name"] == "camper":
+                self.sensor_id = sensor["id"]
+                self.entity_id_by_name = {
+                    e["name"]: e["id"] for e in sensor["entities"]
+                }
+                break
 
         self.entity_states = {
             "household_voltage": None,
@@ -75,25 +66,21 @@ class CamperInterfaceFrame(FrameBase):
             "waste_state": None,
             "pump_state": None,
         }
+        self.executor = futures.ThreadPoolExecutor(max_workers=1)
         self.update_states_runner()
 
-    def household_callback(self):
+    def _api_action(self, entity_name, state):
         try:
-            if "household_state" not in self.entity_id_by_name:
-                raise ApiException(f"No entity_id for `household_state`")
+            if entity_name not in self.entity_id_by_name:
+                raise ApiException(f"No entity_id for `{entity_name}`")
 
-            if self.entity_states["household_state"] == "OFF":
-                data_dict = {"state": "ON"}
-            else:
-                data_dict = {"state": "OFF"}
-
+            data_dict = {"state": state}
             states_resp = requests.post(
-                f"{settings.api_base}/action/{self.entity_id_by_name['household_state']}",
+                f"{settings.api_base}/action/{self.entity_id_by_name[entity_name]}",
                 json=data_dict,
             )
 
-            self.entity_states["household_state"] = states_resp.json()["state"]
-
+            self.entity_states[entity_name] = states_resp.json()["state"]
         except (
             requests.exceptions.Timeout,
             requests.exceptions.ConnectionError,
@@ -108,42 +95,29 @@ class CamperInterfaceFrame(FrameBase):
 
         self.update_camper_gui()
 
+    def household_callback(self):
+        self.household_button.configure(state=tk.DISABLED)
+        self.pump_button.configure(state=tk.DISABLED)
+
+        if self.entity_states["household_state"] == "OFF":
+            self.executor.submit(self._api_action, "household_state", "ON")
+        else:
+            self.executor.submit(self._api_action, "household_state", "OFF")
+
     def pump_callback(self):
-        try:
-            if "pump_state" not in self.entity_id_by_name:
-                raise ApiException(f"No entity_id for `pump_state`")
+        self.household_button.configure(state=tk.DISABLED)
+        self.pump_button.configure(state=tk.DISABLED)
 
-            if self.entity_states["pump_state"] == "OFF":
-                data_dict = {"state": "ON"}
-            else:
-                data_dict = {"state": "OFF"}
-
-            states_resp = requests.post(
-                f"{settings.api_base}/action/{self.entity_id_by_name['pump_state']}",
-                json=data_dict,
-            )
-
-            self.entity_states["pump_state"] = states_resp.json()["state"]
-
-        except (
-            requests.exceptions.Timeout,
-            requests.exceptions.ConnectionError,
-            ApiException,
-        ) as ex:
-            self.entity_states["household_state"] = None
-
-            self.statusbar.add_message(
-                f"Could not update pump state in API: {ex.__class__.__name__}",
-                details=str(ex),
-            )
-
-        self.update_camper_gui()
+        if self.entity_states["pump_state"] == "OFF":
+            self.executor.submit(self._api_action, "pump_state", "ON")
+        else:
+            self.executor.submit(self._api_action, "pump_state", "OFF")
 
     def update_states_runner(self):
         current_tab = self.master.master.get()
 
         if current_tab == "Status":
-            self.update_states()
+            self.executor.submit(self.update_states)
         else:
             for entity_name in self.entity_states.keys():
                 self.entity_states[entity_name] = None
@@ -205,6 +179,9 @@ class CamperInterfaceFrame(FrameBase):
                 self.pump_button.configure(fg_color="darkred", text="Pump [OFF]")
             case _:
                 self.pump_button.configure(fg_color="gray", text="Pump [Unknown]")
+
+        self.household_button.configure(state=tk.NORMAL)
+        self.pump_button.configure(state=tk.NORMAL)
 
         water_progress = 0
         if self.entity_states["water_state"]:

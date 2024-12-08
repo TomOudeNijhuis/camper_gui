@@ -98,6 +98,7 @@ class App(customtkinter.CTk):
                 self.power_frame.update_states()
             case "History":
                 self.graph_frame.update_plot()
+                pass
             case "Messages":
                 self.status_messages_frame.update_messages()
             case _:

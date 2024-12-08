@@ -8,13 +8,11 @@ matplotlib.use("TkAgg")
 
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.backends.backend_tkagg import (
-    NavigationToolbar2Tk as NavigationToolbar2TkAgg,
-)
-from matplotlib.backend_bases import key_press_handler
 import pandas as pd
 
 from config import settings
+from PIL import Image
+import numpy as np
 
 
 class ApiException(Exception):
@@ -22,16 +20,25 @@ class ApiException(Exception):
 
 
 class EntityFrame(customtkinter.CTkScrollableFrame):
-    def __init__(self, master, statusbar):
+    def __init__(self, master, statusbar, click_callback=None):
         super().__init__(master)
         self.statusbar = statusbar
         self.radio_var = tkinter.StringVar(value=None)
         self.radiobuttons = []
+        self.click_callback = click_callback
+
+    def _clicked(self):
+        if self.click_callback:
+            self.click_callback()
 
     def add(self, text):
         self.radiobuttons.append(
             customtkinter.CTkRadioButton(
-                self, text=text.replace("_", " "), variable=self.radio_var, value=text
+                self,
+                text=text.replace("_", " "),
+                variable=self.radio_var,
+                value=text,
+                command=self._clicked,
             )
         )
         self.radiobuttons[-1].grid(
@@ -60,25 +67,16 @@ class GraphFrame(customtkinter.CTkFrame):
         self.plot_y = []
 
         self.canvas = FigureCanvasTkAgg(f, self)
+        # self.img = np.asarray(Image.open("camper_logo.png"))
+
         self.canvas.draw()
-        """
-        self.canvas.get_tk_widget().pack(
-            side=customtkinter.TOP, fill=customtkinter.BOTH, expand=True
-        )
-        """
         self.canvas.get_tk_widget().grid(
             row=0, column=1, padx=10, pady=2, sticky="ew", columnspan=1
         )
-        """
-        self.toolbar = NavigationToolbar2TkAgg(self.canvas, self)
-        self.toolbar.update()
-        self.canvas._tkcanvas.pack(
-            side=customtkinter.TOP, fill=customtkinter.BOTH, expand=True
-        )
-        """
-        self.canvas.mpl_connect("key_press_event", self.on_key_event)
         self.entity_id_by_name = {}
-        self.entity_frame = EntityFrame(self, self.statusbar)
+        self.entity_frame = EntityFrame(
+            self, self.statusbar, self._change_plot_callback
+        )
         self.entity_frame.grid(
             row=0, column=0, padx=10, pady=2, sticky="nsew", columnspan=1
         )
@@ -111,7 +109,10 @@ class GraphFrame(customtkinter.CTkFrame):
         for k, v in self.entity_id_by_name.items():
             self.entity_frame.add(k)
 
-        self.update_plot_runner()
+        # self.update_plot_runner()
+
+    def _change_plot_callback(self):
+        self.update_plot()
 
     def update_plot_runner(self):
         current_tab = self.master.master.get()
@@ -179,8 +180,6 @@ class GraphFrame(customtkinter.CTkFrame):
                 )
         else:
             self.ax.clear()
+            # self.ax.imshow(self.img)
+            # self.ax.axis("off")
             self.canvas.draw()
-
-    def on_key_event(self, event):
-        print("you pressed %s" % event.key)
-        key_press_handler(event, self.canvas, self.toolbar)
