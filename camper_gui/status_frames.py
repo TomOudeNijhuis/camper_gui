@@ -50,7 +50,25 @@ class StatusBarFrame(customtkinter.CTkFrame):
         self.master.destroy()
 
     def screen_off_callback(self):
-        subprocess.run(["xset", "dpms", "force", "off"])
+        try:
+            labwc_result = subprocess.run(
+                ["pidof", "labwc"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+            xwayland_result = subprocess.run(
+                ["pidof", "Xwayland"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+
+            if labwc_result.returncode == 0 or xwayland_result.returncode == 0:
+                # using labwc with wayland
+                # pkill swayidle && swayidle -w timeout 200 'wlopm --off \*' resume 'wlopm --on \*' &
+                subprocess.run(["wlopm", "--off", "\\*"], shell=True)
+                # subprocess.run(["wlr-randr", "--output", "HDMI-A-1", "--off"], shell=True)
+            else:
+                # using xset with xorg
+                subprocess.run(["xset", "dpms", "force", "off"])
+
+        except Exception as e:
+            print(f"Error: {e}")
 
     def add_message(self, message, state="error", details=None):
         self.message_list.insert(
