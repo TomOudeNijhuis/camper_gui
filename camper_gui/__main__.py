@@ -1,6 +1,7 @@
 import customtkinter
 import platform
 import requests
+from concurrent import futures
 
 from camper_interface_frame import CamperInterfaceFrame
 from temperature_frame import TemperatureFrame
@@ -48,20 +49,25 @@ class App(customtkinter.CTk):
                 details=str(ex),
             )
 
+        self.executor = futures.ThreadPoolExecutor(max_workers=1)
+
         self.camper_interface_frame = CamperInterfaceFrame(
-            self.tabview.tab("Status"), self.statusbar_frame, api_sensors
+            self.tabview.tab("Status"), self.statusbar_frame, api_sensors, self.executor
         )
         self.power_frame = PowerFrame(
-            self.tabview.tab("Status"), self.statusbar_frame, api_sensors
+            self.tabview.tab("Status"), self.statusbar_frame, api_sensors, self.executor
         )
         self.temperture_frame = TemperatureFrame(
-            self.tabview.tab("Status"), self.statusbar_frame, api_sensors
+            self.tabview.tab("Status"), self.statusbar_frame, api_sensors, self.executor
         )
         self.graph_frame = GraphFrame(
-            self.tabview.tab("History"), self.statusbar_frame, api_sensors
+            self.tabview.tab("History"),
+            self.statusbar_frame,
+            api_sensors,
+            self.executor,
         )
         self.status_messages_frame = StatusMessagesFrame(
-            self.tabview.tab("Messages"), self.statusbar_frame
+            self.tabview.tab("Messages"), self.statusbar_frame, self.executor
         )
         self.tabview.grid(row=0, column=0, padx=5, pady=0, sticky="nsew")
 
@@ -94,13 +100,13 @@ class App(customtkinter.CTk):
 
         match current_tab:
             case "Status":
-                self.camper_interface_frame.update_states()
-                self.power_frame.update_states()
+                self.executor.submit(self.camper_interface_frame.update_states)
+                self.executor.submit(self.power_frame.update_states)
             case "History":
-                self.graph_frame.update_plot()
-                pass
+                self.graph_frame.reset()
+                # self.executor.submit(self.graph_frame.update_plot)
             case "Messages":
-                self.status_messages_frame.update_messages()
+                self.executor.submit(self.status_messages_frame.update_messages)
             case _:
                 raise Exception(f"Unknown tab {current_tab}")
 

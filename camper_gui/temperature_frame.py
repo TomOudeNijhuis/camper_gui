@@ -9,10 +9,11 @@ class ApiException(Exception):
 
 
 class TemperatureFrame(FrameBase):
-    def __init__(self, master, statusbar, api_sensors):
+    def __init__(self, master, statusbar, api_sensors, executor):
         super().__init__(master)
         self.master = master
         self.statusbar = statusbar
+        self.executor = executor
         self.entity_id_by_name = {}
 
         self.grid_columnconfigure((0, 1), weight=1)
@@ -38,36 +39,22 @@ class TemperatureFrame(FrameBase):
             self._add_entry("Inside Humidity [%]", 3, 1)
         )
 
-        try:
-            self.sensor_outside_id = None
-            self.sensor_inside_id = None
-            for sensor in api_sensors:
-                if sensor["name"] == "outside":
-                    self.sensor_outside_id = sensor["id"]
+        self.sensor_outside_id = None
+        self.sensor_inside_id = None
+        for sensor in api_sensors:
+            if sensor["name"] == "outside":
+                self.sensor_outside_id = sensor["id"]
 
-                    self.entity_id_by_name.update(
-                        {f"outside_{e['name']}": e["id"] for e in sensor["entities"]}
-                    )
+                self.entity_id_by_name.update(
+                    {f"outside_{e['name']}": e["id"] for e in sensor["entities"]}
+                )
 
-                elif sensor["name"] == "inside":
-                    self.sensor_inside_id = sensor["id"]
+            elif sensor["name"] == "inside":
+                self.sensor_inside_id = sensor["id"]
 
-                    self.entity_id_by_name.update(
-                        {f"inside_{e['name']}": e["id"] for e in sensor["entities"]}
-                    )
-
-        except (
-            requests.exceptions.Timeout,
-            requests.exceptions.ConnectionError,
-            ApiException,
-        ) as ex:
-            self.sensor_inside_id = None
-            self.sensor_outside_id = None
-            self.entity_id_by_name = {}
-            self.statusbar.add_message(
-                f"Could not communicatie with API: {ex.__class__.__name__}",
-                details=str(ex),
-            )
+                self.entity_id_by_name.update(
+                    {f"inside_{e['name']}": e["id"] for e in sensor["entities"]}
+                )
 
         self.entity_states = {
             "outside_temperature": None,
@@ -81,7 +68,7 @@ class TemperatureFrame(FrameBase):
         current_tab = self.master.master.get()
 
         if current_tab == "Status":
-            self.update_states()
+            self.executor.submit(self.update_states)
         else:
             for entity_name in self.entity_states.keys():
                 self.entity_states[entity_name] = None
@@ -118,6 +105,14 @@ class TemperatureFrame(FrameBase):
 
             self.statusbar.add_message(
                 f"Could not retrieve status from API: {ex.__class__.__name__}",
+                details=str(ex),
+            )
+        except Exception as ex:
+            for entity_name in self.entity_states.keys():
+                self.entity_states[entity_name] = None
+
+            self.statusbar.add_message(
+                f"General exception: {ex.__class__.__name__}",
                 details=str(ex),
             )
 

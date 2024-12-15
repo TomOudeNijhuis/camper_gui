@@ -1,5 +1,4 @@
 import requests
-from concurrent import futures
 import tkinter as tk
 
 from config import settings
@@ -11,10 +10,11 @@ class ApiException(Exception):
 
 
 class CamperInterfaceFrame(FrameBase):
-    def __init__(self, master, statusbar, api_sensors):
+    def __init__(self, master, statusbar, api_sensors, executor):
         super().__init__(master)
         self.master = master
         self.statusbar = statusbar
+        self.executor = executor
 
         self.grid_columnconfigure((0, 1), weight=1)
         self.grid_rowconfigure(0, weight=0)
@@ -66,7 +66,7 @@ class CamperInterfaceFrame(FrameBase):
             "waste_state": None,
             "pump_state": None,
         }
-        self.executor = futures.ThreadPoolExecutor(max_workers=1)
+
         self.update_states_runner()
 
     def _api_action(self, entity_name, state):
@@ -89,10 +89,16 @@ class CamperInterfaceFrame(FrameBase):
             self.entity_states["household_state"] = None
 
             self.statusbar.add_message(
-                f"Could not update household state in API: {ex.__class__.__name__}",
+                f"Could not retrieve household state from API: {ex.__class__.__name__}",
                 details=str(ex),
             )
+        except Exception as ex:
+            self.entity_states["household_state"] = None
 
+            self.statusbar.add_message(
+                f"General exception: {ex.__class__.__name__}",
+                details=str(ex),
+            )
         self.update_camper_gui()
 
     def household_callback(self):

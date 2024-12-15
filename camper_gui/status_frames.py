@@ -100,9 +100,10 @@ class StatusBarFrame(customtkinter.CTkFrame):
 
 
 class StatusMessagesFrame(customtkinter.CTkFrame):
-    def __init__(self, master, statusbar):
+    def __init__(self, master, statusbar, exceutor):
         super().__init__(master)
         self.statusbar = statusbar
+        self.executor = exceutor
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=7)
@@ -143,7 +144,7 @@ class StatusMessagesFrame(customtkinter.CTkFrame):
         current_tab = self.master.master.get()
 
         if current_tab == "Messages":
-            self.update_messages()
+            self.executor.submit(self.update_messages)
 
         self.after(5000, self.update_messages_runner)
 
